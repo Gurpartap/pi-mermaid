@@ -4,6 +4,9 @@
   "description": "🧜‍♀️ Pi extension that renders Mermaid diagrams as ASCII in the TUI",
   "author": "Gurpartap Singh",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Gurpartap/pi-mermaid.git"
@@ -13,6 +16,9 @@
   },
   "homepage": "https://github.com/Gurpartap/pi-mermaid",
   "keywords": ["pi", "pi-extension", "pi-package", "mermaid", "ascii", "tui"],
+  "engines": {
+    "node": ">=20"
+  },
   "files": ["index.ts", "README.md", "LICENSE", "package.json"],
   "dependencies": {
     "beautiful-mermaid": "^0.1.3",
