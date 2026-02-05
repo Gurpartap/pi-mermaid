@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/pi-mermaid.svg)](https://www.npmjs.com/package/pi-mermaid)
 [![license](https://img.shields.io/npm/l/pi-mermaid.svg)](LICENSE)
 
-Pi extension that renders Mermaid diagrams as ASCII in the TUI.
+Pi extension that renders Mermaid diagrams as ASCII in the TUI. It uses [Mermaid's parser](https://github.com/mermaid-js/mermaid) for syntax validation and [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) to render the ASCII art.
 
 Pi → https://pi.dev/
 
