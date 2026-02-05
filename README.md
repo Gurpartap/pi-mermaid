@@ -10,6 +10,7 @@ Pi → https://pi.dev/
 
 ## Features
 - Renders Mermaid blocks as ASCII diagrams inside Pi's TUI
+- Width-aware rendering: auto-selects tighter padding presets and clips output for narrow terminals
 - Collapsible output with source shown only on expand (ctrl+o)
 - Token efficiently adds parser warnings/errors to LLM context
 - Handles large blocks with safety limits and caching

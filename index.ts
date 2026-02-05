@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, MessageRenderer, SessionEntry } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
-import { Box, Spacer, Text } from "@mariozechner/pi-tui";
+import { Box, Spacer, Text, type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { createHash } from "node:crypto";
 import { renderMermaidAscii } from "beautiful-mermaid";
 
@@ -13,6 +13,15 @@ const MAX_SOURCE_LINES = 400;
 const MAX_SOURCE_CHARS = 20000;
 const MAX_SEEN_ISSUES = 200;
 const MAX_ASCII_CACHE = 200;
+const ASCII_PRESETS: Array<{ key: string; paddingX: number; boxBorderPadding: number }> = [
+	{ key: "default", paddingX: 5, boxBorderPadding: 1 },
+	{ key: "compact", paddingX: 3, boxBorderPadding: 1 },
+	{ key: "tight", paddingX: 2, boxBorderPadding: 1 },
+	{ key: "squeezed", paddingX: 1, boxBorderPadding: 0 },
+];
+
+type AsciiPreset = (typeof ASCII_PRESETS)[number];
+
 const SUPPORTED_TYPES = new Map<string, string>([
 	["graph", "flowchart"],
 	["flowchart", "flowchart"],
@@ -28,7 +37,8 @@ let mermaidParser: ((text: string) => Promise<void>) | null = null;
 let mermaidParserError: string | null = null;
 let mermaidParserWarned = false;
 const seenIssueKeys = new Map<string, true>();
-const asciiCache = new Map<string, { ascii: string; lineCount: number }>();
+const asciiCache = new Map<string, AsciiVariant>();
+const asciiLinesCache = new Map<string, { lines: string[]; previewLines: string[] }>();
 
 function isDomPurifyError(message: string): boolean {
 	return message.includes("DOMPurify.addHook") || message.includes("DOMPurify");
@@ -69,11 +79,19 @@ interface MermaidIssue {
 	message: string;
 }
 
+interface AsciiVariant {
+	presetKey: string;
+	ascii: string;
+	lineCount: number;
+	maxLineWidth: number;
+}
+
 interface MermaidDetails {
 	source: string;
 	index: number;
 	ascii: string;
 	lineCount: number;
+	variants?: AsciiVariant[];
 	issues?: MermaidIssue[];
 }
 
@@ -154,7 +172,11 @@ function hashMermaid(block: string): string {
 	return createHash("sha256").update(block).digest("hex").slice(0, 8);
 }
 
-function getCachedAscii(key: string): { ascii: string; lineCount: number } | null {
+function getAsciiCacheKey(diagramHash: string, presetKey: string): string {
+	return `${diagramHash}:${presetKey}`;
+}
+
+function getCachedVariant(key: string): AsciiVariant | null {
 	const cached = asciiCache.get(key);
 	if (!cached) return null;
 	asciiCache.delete(key);
@@ -162,12 +184,81 @@ function getCachedAscii(key: string): { ascii: string; lineCount: number } | nul
 	return cached;
 }
 
-function setCachedAscii(key: string, ascii: string, lineCount: number): void {
-	asciiCache.set(key, { ascii, lineCount });
+function setCachedVariant(key: string, variant: AsciiVariant): void {
+	asciiCache.set(key, variant);
 	if (asciiCache.size > MAX_ASCII_CACHE) {
 		const oldest = asciiCache.keys().next().value as string | undefined;
 		if (oldest) asciiCache.delete(oldest);
 	}
+}
+
+function countAsciiLines(ascii: string): number {
+	if (!ascii) return 0;
+	return ascii.split(/\r?\n/).length;
+}
+
+function maxAsciiLineWidth(ascii: string): number {
+	if (!ascii) return 0;
+	return ascii.split(/\r?\n/).reduce((max, line) => Math.max(max, visibleWidth(line)), 0);
+}
+
+function getCachedAsciiLines(ascii: string): { lines: string[]; previewLines: string[] } {
+	if (!ascii) return { lines: [], previewLines: [] };
+	const cached = asciiLinesCache.get(ascii);
+	if (cached) {
+		asciiLinesCache.delete(ascii);
+		asciiLinesCache.set(ascii, cached);
+		return cached;
+	}
+
+	const lines = ascii.split(/\r?\n/);
+	const previewLines = lines.length > COLLAPSED_LINES ? lines.slice(0, COLLAPSED_LINES) : lines;
+	const entry = { lines, previewLines };
+	asciiLinesCache.set(ascii, entry);
+	if (asciiLinesCache.size > MAX_ASCII_CACHE) {
+		const oldest = asciiLinesCache.keys().next().value as string | undefined;
+		if (oldest) asciiLinesCache.delete(oldest);
+	}
+	return entry;
+}
+
+function renderAsciiVariant(block: string, diagramHash: string, preset: AsciiPreset): AsciiVariant {
+	const cacheKey = getAsciiCacheKey(diagramHash, preset.key);
+	const cached = getCachedVariant(cacheKey);
+	if (cached) return cached;
+
+	const ascii = renderMermaidAscii(block, {
+		paddingX: preset.paddingX,
+		boxBorderPadding: preset.boxBorderPadding,
+	}).trimEnd();
+	const lineCount = countAsciiLines(ascii);
+	const maxLineWidth = maxAsciiLineWidth(ascii);
+	getCachedAsciiLines(ascii);
+	const variant: AsciiVariant = { presetKey: preset.key, ascii, lineCount, maxLineWidth };
+	setCachedVariant(cacheKey, variant);
+	return variant;
+}
+
+function selectAsciiVariant(
+	width: number,
+	variants: AsciiVariant[] | undefined,
+	fallbackAscii: string,
+	fallbackLineCount: number,
+): { ascii: string; lineCount: number; maxLineWidth: number; clipped: boolean } {
+	const safeWidth = Math.max(1, width);
+	if (variants && variants.length > 0) {
+		for (const variant of variants) {
+			if (variant.maxLineWidth <= safeWidth) {
+				return { ...variant, clipped: false };
+			}
+		}
+		const tightest = variants[variants.length - 1];
+		return { ...tightest, clipped: tightest.maxLineWidth > safeWidth };
+	}
+
+	const maxLineWidth = maxAsciiLineWidth(fallbackAscii);
+	const lineCount = fallbackLineCount || countAsciiLines(fallbackAscii);
+	return { ascii: fallbackAscii, lineCount, maxLineWidth, clipped: maxLineWidth > safeWidth };
 }
 
 function splitIssuesFromContent(text: string): { ascii: string; issues: MermaidIssue[] } {
@@ -266,21 +357,25 @@ async function processBlock(
 
 	let ascii = "";
 	let lineCount = 0;
+	let variants: AsciiVariant[] | undefined;
 	if (parserFailed) {
 		ascii = "[parse failed]";
 		lineCount = 1;
 	} else {
 		try {
-			const cached = getCachedAscii(diagramHash);
-			ascii = cached?.ascii ?? renderMermaidAscii(block).trimEnd();
-			lineCount = cached?.lineCount ?? (ascii ? ascii.split("\n").length : 0);
-			if (!cached) setCachedAscii(diagramHash, ascii, lineCount);
+			variants = ASCII_PRESETS.map((preset) => renderAsciiVariant(block, diagramHash, preset));
+			if (variants.length === 0) {
+				throw new Error("No ASCII variants rendered");
+			}
+			ascii = variants[0].ascii;
+			lineCount = variants[0].lineCount;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			const message = `Mermaid render failed${blockLabel}: ${errorMessage}`;
 			addIssue("error", message);
 			ascii = "[render failed]";
 			lineCount = 1;
+			variants = undefined;
 		}
 	}
 
@@ -291,6 +386,7 @@ async function processBlock(
 			index: blockIndex,
 			ascii,
 			lineCount,
+			variants: variants && variants.length > 0 ? variants : undefined,
 			issues: issues.length > 0 ? issues : undefined,
 		},
 		issues,
@@ -301,27 +397,50 @@ async function processBlock(
 export default function (pi: ExtensionAPI) {
 	const renderMermaidMessage: MessageRenderer<MermaidDetails> = (message, { expanded }, theme) => {
 		const details = message.details as MermaidDetails | undefined;
-		const label = theme.fg("customMessageLabel", theme.bold("Mermaid (ASCII)"));
 		const contentText = extractText(message.content);
 		const fallback = splitIssuesFromContent(contentText);
-		const rawAscii = details?.ascii ?? fallback.ascii;
-		const lineCount = details?.lineCount ?? (rawAscii ? rawAscii.split("\n").length : 0);
-		const hasOverflow = lineCount > COLLAPSED_LINES;
-		const isExpanded = expanded || !hasOverflow;
-		let preview = rawAscii || "";
-		if (!isExpanded && rawAscii) {
-			preview = rawAscii.split("\n").slice(0, COLLAPSED_LINES).join("\n");
-		}
-		const remainingLines = hasOverflow ? lineCount - COLLAPSED_LINES : 0;
-		let text = `${label}\n${preview}`;
+		const fallbackAscii = details?.ascii ?? fallback.ascii;
+		const fallbackLineCount = details?.lineCount ?? countAsciiLines(fallbackAscii);
+		const variants = details?.variants;
 
-		if (hasOverflow && !isExpanded) {
-			const hintText = `... (${remainingLines} more lines, ${keyHint("expandTools", "to expand")})`;
-			text += `\n${theme.fg("muted", hintText)}`;
-		}
+		const asciiComponent: Component = {
+			render: (width) => {
+				const contentWidth = Math.max(1, width);
+				const label = theme.fg("customMessageLabel", theme.bold("Mermaid (ASCII)"));
+				const selection = selectAsciiVariant(contentWidth, variants, fallbackAscii, fallbackLineCount);
+				const asciiLines = getCachedAsciiLines(selection.ascii);
+				const hasOverflow = selection.lineCount > COLLAPSED_LINES;
+				const isExpanded = expanded || !hasOverflow;
+				const visibleLines = isExpanded ? asciiLines.lines : asciiLines.previewLines;
+				const needsClip = selection.maxLineWidth > contentWidth;
+				const clipAsciiLine = needsClip
+					? (line: string) => truncateToWidth(line, contentWidth, "")
+					: (line: string) => line;
+
+				const lines: string[] = [];
+				lines.push(truncateToWidth(label, contentWidth));
+				for (const line of visibleLines) {
+					lines.push(clipAsciiLine(line));
+				}
+
+				if (hasOverflow && !isExpanded) {
+					const remainingLines = selection.lineCount - COLLAPSED_LINES;
+					const hintText = `... (${remainingLines} more lines, ${keyHint("expandTools", "to expand")})`;
+					lines.push(truncateToWidth(theme.fg("muted", hintText), contentWidth));
+				}
+
+				if (selection.clipped) {
+					const hintText = "... (clipped to fit width; widen terminal to view full diagram)";
+					lines.push(truncateToWidth(theme.fg("muted", hintText), contentWidth));
+				}
+
+				return lines;
+			},
+			invalidate: () => {},
+		};
 
 		const box = new Box(1, 1, (t: string) => theme.bg("customMessageBg", t));
-		box.addChild(new Text(text, 0, 0));
+		box.addChild(asciiComponent);
 
 		if (expanded && details?.source) {
 			box.addChild(new Spacer(1));
