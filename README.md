@@ -1,6 +1,12 @@
 # 🧜‍♀️ pi-mermaid
 
+[![pi coding agent](https://img.shields.io/badge/pi-coding%20agent-6f6bff?logo=terminal&logoColor=white)](https://pi.dev/)
+[![npm version](https://img.shields.io/npm/v/pi-mermaid.svg)](https://www.npmjs.com/package/pi-mermaid)
+[![license](https://img.shields.io/npm/l/pi-mermaid.svg)](LICENSE)
+
 Pi extension that renders Mermaid diagrams as ASCII in the TUI.
+
+Pi → https://pi.dev/
 
 ## Features
 - Renders Mermaid blocks as ASCII diagrams inside Pi's TUI
@@ -234,6 +240,14 @@ classDiagram
   Animal <|-- Cat
 ```
 ````
+
+## Credits
+This extension depends on and is made possible by these projects:
+- [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)
+- [Mermaid](https://github.com/mermaid-js/mermaid)
+- [Pi](https://pi.dev/)
+
+Thank you to the maintainers and contributors of these projects.
 
 ## License
 MIT © 2026 Gurpartap Singh (https://x.com/Gurpartap)
