@@ -363,7 +363,17 @@ async function processBlock(
 		lineCount = 1;
 	} else {
 		try {
-			variants = ASCII_PRESETS.map((preset) => renderAsciiVariant(block, diagramHash, preset));
+			variants = [];
+			for (const preset of ASCII_PRESETS) {
+				try {
+					variants.push(renderAsciiVariant(block, diagramHash, preset));
+				} catch (error) {
+					if (preset.key === "squeezed") continue;
+					const errorMessage = error instanceof Error ? error.message : String(error);
+					const message = `Mermaid render failed${blockLabel} (${preset.key}): ${errorMessage}`;
+					notifications.push({ message, type: "warning" });
+				}
+			}
 			if (variants.length === 0) {
 				throw new Error("No ASCII variants rendered");
 			}
@@ -476,7 +486,7 @@ export default function (pi: ExtensionAPI) {
 			const suffixSource = errorMessage ?? mermaidParserError;
 			const suffix = suffixSource ? ` (${suffixSource})` : "";
 			notify(
-				`Mermaid validation isn’t usable right now${suffix}. Will try again next time; rendering anyway.`,
+				`Mermaid parser validation isn’t usable right now${suffix}. Will try again next time; rendering anyway.`,
 				"warning",
 			);
 			mermaidParserWarned = true;
