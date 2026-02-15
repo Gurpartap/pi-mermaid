@@ -15,6 +15,9 @@ Pi → https://pi.dev/
 - Token efficiently adds parser warnings/errors to LLM context
 - Handles large blocks with safety limits and caching
 
+## Demo
+<video controls src="https://raw.githubusercontent.com/Gurpartap/pi-mermaid/refs/heads/main/assets/pi-mermaid.mp4" title="pi-mermaid demo"></video>
+
 ## Install
 
 ```bash
