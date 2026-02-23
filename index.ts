@@ -230,6 +230,7 @@ function renderAsciiVariant(block: string, diagramHash: string, preset: AsciiPre
 	const ascii = renderMermaidAscii(block, {
 		paddingX: preset.paddingX,
 		boxBorderPadding: preset.boxBorderPadding,
+		colorMode: "none",
 	}).trimEnd();
 	const lineCount = countAsciiLines(ascii);
 	const maxLineWidth = maxAsciiLineWidth(ascii);
