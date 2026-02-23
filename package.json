@@ -33,8 +33,8 @@
     "package.json"
   ],
   "dependencies": {
-    "beautiful-mermaid": "^0.1.3",
-    "mermaid": "^11.12.2"
+    "beautiful-mermaid": "^1.0.0",
+    "mermaid": "^11.0.0"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
