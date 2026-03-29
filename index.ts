@@ -436,7 +436,7 @@ export default function (pi: ExtensionAPI) {
 
 				if (hasOverflow && !isExpanded) {
 					const remainingLines = selection.lineCount - COLLAPSED_LINES;
-					const hintText = `... (${remainingLines} more lines, ${keyHint("expandTools", "to expand")})`;
+					const hintText = `... (${remainingLines} more lines, ${keyHint("app.tools.expand", "to expand")})`;
 					lines.push(truncateToWidth(theme.fg("muted", hintText), contentWidth));
 				}
 
