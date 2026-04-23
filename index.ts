@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, MessageRenderer, SessionEntry } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
-import { Box, Spacer, Text, type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { keyHint } from "@mariozechner/pi-coding-agent";
+import { Box, type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { createHash } from "node:crypto";
 import { renderMermaidAscii } from "beautiful-mermaid";
 
@@ -452,21 +452,6 @@ export default function (pi: ExtensionAPI) {
 
 		const box = new Box(1, 1, (t: string) => theme.bg("customMessageBg", t));
 		box.addChild(asciiComponent);
-
-		if (expanded && details?.source) {
-			box.addChild(new Spacer(1));
-			const markdownTheme = getMarkdownTheme();
-			const indent = markdownTheme.codeBlockIndent ?? "  ";
-			const normalizedSource = normalizeMermaidSource(details.source);
-			const highlighted = markdownTheme.highlightCode?.(normalizedSource, "mermaid");
-			const codeLines = highlighted ?? normalizedSource.split("\n").map((line) => markdownTheme.codeBlock(line));
-			const renderedLines = [
-				markdownTheme.codeBlockBorder("```mermaid"),
-				...codeLines.map((line) => `${indent}${line}`),
-				markdownTheme.codeBlockBorder("```"),
-			].join("\n");
-			box.addChild(new Text(renderedLines, 0, 0));
-		}
 
 		return box;
 	};
