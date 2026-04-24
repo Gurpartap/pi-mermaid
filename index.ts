@@ -516,7 +516,7 @@ export default function (pi: ExtensionAPI) {
 				warnParserUnavailable,
 			);
 
-				const contextContent = buildContextContent(issues);
+			const contextContent = buildContextContent(issues);
 			pi.sendMessage({
 				customType: MESSAGE_TYPE,
 				content: contextContent,
