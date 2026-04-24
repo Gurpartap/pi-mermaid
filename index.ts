@@ -3,6 +3,7 @@ import { keyHint } from "@mariozechner/pi-coding-agent";
 import { Box, Spacer, type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { createHash } from "node:crypto";
 import { renderMermaidAscii } from "beautiful-mermaid";
+import pako from "pako";
 
 const MESSAGE_TYPE = "pi-mermaid";
 const MERMAID_BLOCK_RE = /```mermaid\s*([\s\S]*?)```/gi;
@@ -170,6 +171,13 @@ function getSupportedMermaidType(block: string): { token: string | null; normali
 
 function hashMermaid(block: string): string {
 	return createHash("sha256").update(block).digest("hex").slice(0, 8);
+}
+
+function mermaidLiveUrl(source: string): string {
+	const state = JSON.stringify({ code: source, mermaid: { theme: "default" }, autoSync: true });
+	const compressed = pako.deflate(new TextEncoder().encode(state));
+	const base64 = Buffer.from(compressed).toString("base64url");
+	return `https://mermaid.live/edit#pako:${base64}`;
 }
 
 function getAsciiCacheKey(diagramHash: string, presetKey: string): string {
