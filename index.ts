@@ -108,24 +108,11 @@ function normalizeMermaidSource(source: string): string {
 	return source.replace(/\s+$/g, "");
 }
 
-function formatIssueLines(issues: MermaidIssue[], hash: string): string {
-	if (issues.length === 0) return "";
-	return issues.map((issue) => `[mermaid:${issue.severity}][hash:${hash}] ${issue.message}`).join("\n");
-}
-
-function buildContextContent(
-	block: string,
-	hash: string,
-	issues: MermaidIssue[],
-	includeSource: boolean,
-): string {
-	const issueLines = formatIssueLines(issues, hash);
-	if (!includeSource) return issueLines;
-
-	const normalizedBlock = normalizeMermaidSource(block);
-	const sourceBlock = `%% mermaid-hash: ${hash}\n${normalizedBlock}`;
-	const contextBlock = `\`\`\`mermaid\n${sourceBlock}\n\`\`\``;
-	return issueLines ? `${issueLines}\n\n${contextBlock}` : contextBlock;
+function buildContextContent(issues: MermaidIssue[]): string {
+	const status = `[Mermaid diagram rendered for user]`;
+	if (issues.length === 0) return status;
+	const issueLines = issues.map((i) => `[mermaid:${i.severity}] ${i.message}`).join("\n");
+	return `${issueLines}\n\n${status}`;
 }
 
 function extractText(content: unknown): string {
@@ -476,7 +463,6 @@ export default function (pi: ExtensionAPI) {
 	const renderBlocks = async (
 		blocks: string[],
 		ctx: ExtensionContext,
-		options: { includeSourceInContext?: boolean } = {},
 	) => {
 		const notify = (message: string, type: "info" | "warning" | "error") => {
 			if (ctx.hasUI) ctx.ui.notify(message, type);
@@ -530,8 +516,7 @@ export default function (pi: ExtensionAPI) {
 				warnParserUnavailable,
 			);
 
-			const includeSource = options.includeSourceInContext ?? true;
-			const contextContent = buildContextContent(block, diagramHash, issues, includeSource);
+			const contextContent = buildContextContent(issues);
 			pi.sendMessage({
 				customType: MESSAGE_TYPE,
 				content: contextContent,
@@ -554,7 +539,7 @@ export default function (pi: ExtensionAPI) {
 		const blocks = extractMermaidBlocks(text, MAX_BLOCKS + 1);
 		if (blocks.length === 0) return { action: "continue" };
 
-		await renderBlocks(blocks, ctx, { includeSourceInContext: blocks.length > 1 });
+		await renderBlocks(blocks, ctx);
 		return { action: "continue" };
 	});
 
@@ -572,7 +557,7 @@ export default function (pi: ExtensionAPI) {
 		const blocks = extractMermaidBlocks(assistantText, MAX_BLOCKS + 1);
 		if (blocks.length === 0) return;
 
-		await renderBlocks(blocks, ctx, { includeSourceInContext: blocks.length > 1 });
+		await renderBlocks(blocks, ctx);
 	});
 
 	pi.registerCommand("pi-mermaid", {
@@ -590,7 +575,7 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			await renderBlocks(blocks, ctx, { includeSourceInContext: true });
+			await renderBlocks(blocks, ctx);
 		},
 	});
 }
