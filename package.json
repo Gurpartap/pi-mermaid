@@ -28,6 +28,7 @@
   },
   "files": [
     "index.ts",
+    "i18n.ts",
     "README.md",
     "LICENSE",
     "package.json"

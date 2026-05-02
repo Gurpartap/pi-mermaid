@@ -3,6 +3,7 @@ import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
 import { Box, Spacer, Text, type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { createHash } from "node:crypto";
 import { renderMermaidAscii } from "beautiful-mermaid";
+import { initI18n, t } from "./i18n.ts";
 
 const MESSAGE_TYPE = "pi-mermaid";
 const MERMAID_BLOCK_RE = /```mermaid\s*([\s\S]*?)```/gi;
@@ -406,6 +407,8 @@ async function processBlock(
 }
 
 export default function (pi: ExtensionAPI) {
+	initI18n(pi);
+
 	const renderMermaidMessage: MessageRenderer<MermaidDetails> = (message, { expanded }, theme) => {
 		const details = message.details as MermaidDetails | undefined;
 		const contentText = extractText(message.content);
@@ -486,10 +489,7 @@ export default function (pi: ExtensionAPI) {
 			if (!ctx.hasUI || mermaidParserWarned) return;
 			const suffixSource = errorMessage ?? mermaidParserError;
 			const suffix = suffixSource ? ` (${suffixSource})` : "";
-			notify(
-				`Mermaid parser validation isn’t usable right now${suffix}. Will try again next time; rendering anyway.`,
-				"warning",
-			);
+			notify(t("notify.parserUnavailable", { suffix }), "warning");
 			mermaidParserWarned = true;
 		};
 
@@ -497,7 +497,7 @@ export default function (pi: ExtensionAPI) {
 		if (!parser) warnParserUnavailable();
 
 		if (blocks.length > MAX_BLOCKS) {
-			notify(`Found ${blocks.length} mermaid blocks, rendering first ${MAX_BLOCKS}.`, "warning");
+			notify(t("notify.tooManyBlocks", { count: blocks.length, max: MAX_BLOCKS }), "warning");
 		}
 
 		for (const [index, block] of blocks.slice(0, MAX_BLOCKS).entries()) {
@@ -506,7 +506,7 @@ export default function (pi: ExtensionAPI) {
 			const sourceLines = block.split(/\r?\n/);
 			if (sourceLines.length > MAX_SOURCE_LINES || block.length > MAX_SOURCE_CHARS) {
 				notify(
-					`Mermaid block ${blockIndex} too large (${sourceLines.length} lines, ${block.length} chars).`,
+					t("notify.blockTooLarge", { index: blockIndex, lines: sourceLines.length, chars: block.length }),
 					"warning",
 				);
 				continue;
@@ -516,7 +516,7 @@ export default function (pi: ExtensionAPI) {
 			if (!normalized) {
 				const typeLabel = token ?? "unknown";
 				notify(
-					`pi-mermaid can't render type "${typeLabel}"${blockLabel}. Supported: ${SUPPORTED_TYPE_LABEL}.`,
+					t("notify.unsupportedType", { type: typeLabel, blockLabel, supported: SUPPORTED_TYPE_LABEL }),
 					"info",
 				);
 				continue;
@@ -576,17 +576,17 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("pi-mermaid", {
-		description: "Render mermaid in last assistant message as ASCII",
+		description: t("command.description"),
 		handler: async (_args, ctx) => {
 			const lastAssistant = getLastAssistantText(ctx.sessionManager.getBranch());
 			if (!lastAssistant) {
-				if (ctx.hasUI) ctx.ui.notify("No assistant message found", "warning");
+				if (ctx.hasUI) ctx.ui.notify(t("command.noAssistant"), "warning");
 				return;
 			}
 
 			const blocks = extractMermaidBlocks(lastAssistant, MAX_BLOCKS + 1);
 			if (blocks.length === 0) {
-				if (ctx.hasUI) ctx.ui.notify("No mermaid blocks found", "warning");
+				if (ctx.hasUI) ctx.ui.notify(t("command.noBlocks"), "warning");
 				return;
 			}
 
