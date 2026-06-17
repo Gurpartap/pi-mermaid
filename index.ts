@@ -44,10 +44,35 @@ function isDomPurifyError(message: string): boolean {
 	return message.includes("DOMPurify.addHook") || message.includes("DOMPurify");
 }
 
+async function patchDomPurifyForNode(): Promise<void> {
+	// dompurify's ESM build returns a factory stub (isSupported=false, no
+	// addHook/sanitize) when there is no window/document. Mermaid's strict
+	// securityLevel calls DOMPurify.addHook during parse for labeled nodes,
+	// which throws "DOMPurify.addHook is not a function" in the TUI runtime.
+	// Patch the shared default export with no-op hooks + identity sanitize so
+	// mermaid.parse() validation can run. Rendering uses beautiful-mermaid
+	// (DOM-free), so this only affects the optional validation step.
+	try {
+		const mod = await import("dompurify");
+		const dp = (mod as any).default;
+		if (!dp || dp.isSupported === false) {
+			if (typeof dp.addHook !== "function") dp.addHook = () => {};
+			if (typeof dp.removeHook !== "function") dp.removeHook = () => {};
+			if (typeof dp.removeAllHooks !== "function") dp.removeAllHooks = () => {};
+			if (typeof dp.sanitize !== "function") dp.sanitize = (txt: string) => txt;
+			if (typeof dp.isValidAttribute !== "function") dp.isValidAttribute = () => true;
+			if (typeof dp.addConfig !== "function") dp.addConfig = () => {};
+		}
+	} catch {
+		// dompurify not resolvable; nothing to patch
+	}
+}
+
 async function getMermaidParser(): Promise<((text: string) => Promise<void>) | null> {
 	if (mermaidParser || mermaidParserError) return mermaidParser;
 
 	try {
+		await patchDomPurifyForNode();
 		const mod = await import("mermaid");
 		const api = (mod as any).default ?? (mod as any).mermaidAPI ?? mod;
 		if (!api || typeof api.parse !== "function") {
