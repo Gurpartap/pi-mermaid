@@ -1,6 +1,6 @@
-import type { ExtensionAPI, ExtensionContext, MessageRenderer, SessionEntry } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
-import { Box, Spacer, Text, type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, ExtensionContext, MessageRenderer, SessionEntry } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
+import { Box, Spacer, Text, type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { createHash } from "node:crypto";
 import { renderMermaidAscii } from "beautiful-mermaid";
 
