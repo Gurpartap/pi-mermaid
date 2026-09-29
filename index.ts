@@ -39,6 +39,9 @@ let mermaidParserWarned = false;
 const seenIssueKeys = new Map<string, true>();
 const asciiCache = new Map<string, AsciiVariant>();
 const asciiLinesCache = new Map<string, { lines: string[]; previewLines: string[] }>();
+// Diagram hashes already injected by the agent_end hook. Prevents re-sending the
+// same render on repeated lifecycle events (and, historically, an infinite loop).
+const renderedAgentHashes = new Set<string>();
 
 function isDomPurifyError(message: string): boolean {
 	return message.includes("DOMPurify.addHook") || message.includes("DOMPurify");
@@ -476,7 +479,7 @@ export default function (pi: ExtensionAPI) {
 	const renderBlocks = async (
 		blocks: string[],
 		ctx: ExtensionContext,
-		options: { includeSourceInContext?: boolean } = {},
+		options: { includeSourceInContext?: boolean; dedupe?: boolean } = {},
 	) => {
 		const notify = (message: string, type: "info" | "warning" | "error") => {
 			if (ctx.hasUI) ctx.ui.notify(message, type);
@@ -530,14 +533,29 @@ export default function (pi: ExtensionAPI) {
 				warnParserUnavailable,
 			);
 
+			if (options.dedupe) {
+				if (renderedAgentHashes.has(diagramHash)) continue;
+				renderedAgentHashes.add(diagramHash);
+				if (renderedAgentHashes.size > MAX_ASCII_CACHE) {
+					const oldest = renderedAgentHashes.values().next().value;
+					if (oldest !== undefined) renderedAgentHashes.delete(oldest);
+				}
+			}
+
 			const includeSource = options.includeSourceInContext ?? true;
 			const contextContent = buildContextContent(block, diagramHash, issues, includeSource);
-			pi.sendMessage({
-				customType: MESSAGE_TYPE,
-				content: contextContent,
-				display: true,
-				details,
-			});
+			pi.sendMessage(
+				{
+					customType: MESSAGE_TYPE,
+					content: contextContent,
+					display: true,
+					details,
+				},
+				// Never start a new model turn from a lifecycle hook. Without this,
+				// agent_end re-triggers itself whenever the reply contains a mermaid
+				// block, producing an infinite generation loop.
+				{ triggerTurn: false },
+			);
 
 			for (const notification of notifications) {
 				notify(notification.message, notification.type);
@@ -572,7 +590,7 @@ export default function (pi: ExtensionAPI) {
 		const blocks = extractMermaidBlocks(assistantText, MAX_BLOCKS + 1);
 		if (blocks.length === 0) return;
 
-		await renderBlocks(blocks, ctx, { includeSourceInContext: blocks.length > 1 });
+		await renderBlocks(blocks, ctx, { includeSourceInContext: blocks.length > 1, dedupe: true });
 	});
 
 	pi.registerCommand("pi-mermaid", {
