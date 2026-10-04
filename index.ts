@@ -530,14 +530,16 @@ export default function (pi: ExtensionAPI) {
 				warnParserUnavailable,
 			);
 
-			const includeSource = options.includeSourceInContext ?? true;
-			const contextContent = buildContextContent(block, diagramHash, issues, includeSource);
-			pi.sendMessage({
-				customType: MESSAGE_TYPE,
-				content: contextContent,
-				display: true,
-				details,
-			});
+			const contextContent = buildContextContent(block, diagramHash, issues, options.includeSourceInContext ?? false);
+			pi.sendMessage(
+				{
+					customType: MESSAGE_TYPE,
+					content: contextContent,
+					display: true,
+					details,
+				},
+				{ triggerTurn: false },
+			);
 
 			for (const notification of notifications) {
 				notify(notification.message, notification.type);
@@ -554,7 +556,7 @@ export default function (pi: ExtensionAPI) {
 		const blocks = extractMermaidBlocks(text, MAX_BLOCKS + 1);
 		if (blocks.length === 0) return { action: "continue" };
 
-		await renderBlocks(blocks, ctx, { includeSourceInContext: blocks.length > 1 });
+		await renderBlocks(blocks, ctx, { includeSourceInContext: false });
 		return { action: "continue" };
 	});
 
@@ -572,7 +574,7 @@ export default function (pi: ExtensionAPI) {
 		const blocks = extractMermaidBlocks(assistantText, MAX_BLOCKS + 1);
 		if (blocks.length === 0) return;
 
-		await renderBlocks(blocks, ctx, { includeSourceInContext: blocks.length > 1 });
+		await renderBlocks(blocks, ctx, { includeSourceInContext: false });
 	});
 
 	pi.registerCommand("pi-mermaid", {
